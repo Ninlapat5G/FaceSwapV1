@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Face Swap Application</title>
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <style>
+        #input-images {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 20px;
+        }
+        .input-image {
+            max-width: 200px; /* Set a maximum width for input images */
+            max-height: 200px; /* Set a maximum height for input images */
+            border: 1px solid #ccc;
+            padding: 5px;
+        }
+        #result {
+            max-width: 400px; /* Set a maximum width for the result image */
+            max-height: 400px; /* Set a maximum height for the result image */
+            margin-top: 20px;
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Face Swap Application</h1>
+    <form id="upload-form" enctype="multipart/form-data">
+        <input type="file" name="file1" accept="image/*" required>
+        <input type="file" name="file2" accept="image/*" required>
+        <input type="number" name="num_faces" min="1" value="1" required>
+        <button type="submit">Swap Faces</button>
+    </form>
+    <div id="progress"></div>
+
+    <div id="input-images">
+        <img id="input-image1" class="input-image" style="display: none;">
+        <img id="input-image2" class="input-image" style="display: none;">
+    </div>
+    
+    <img id="result" style="display: none;">
+    <a id="download-link" style="display: none;" download="face_swap_result.jpg">Download Result</a>
+
+    <script>
+        $(document).ready(function() {
+            $('input[type="file"]').change(function(e) {
+                const fileInput = e.target;
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const imgElement = fileInput.name === 'file1' ? '#input-image1' : '#input-image2';
+                    $(imgElement).attr('src', event.target.result).show();
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            });
+
+            $('#upload-form').submit(function(e) {
+                e.preventDefault();
+                var formData = new FormData(this);
+                
+                $.ajax({
+                    url: '/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(data) {
+                        checkProgress();
+                    },
+                    error: function(jqXHR, textStatus, errorThrown) {
+                        alert('Error: ' + errorThrown);
+                    }
+                });
+            });
+
+            function checkProgress() {
+                $.getJSON('/progress', function(data) {
+                    $('#progress').text('Progress: ' + data.progress + '%');
+                    if (data.processing) {
+                        setTimeout(checkProgress, 1000);
+                    } else {
+                        getResult();
+                    }
+                });
+            }
+
+            function getResult() {
+                $.getJSON('/result', function(data) {
+                    if (data.image) {
+                        $('#result').attr('src', 'data:image/jpeg;base64,' + data.image).show();
+                        $('#download-link')
+                            .attr('href', '/download/' + data.result_id)
+                            .show();
+                    } else {
+                        alert('Error: Result not found');
+                    }
+                });
+            }
+        });
+    </script>
+</body>
+</html>

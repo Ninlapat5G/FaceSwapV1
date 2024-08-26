@@ -4,79 +4,122 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Face Swap Application</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-        #input-images {
-            display: flex;
-            justify-content: space-around;
-            margin-top: 20px;
+        body {
+            background-color: #f8f9fa;
         }
-        .input-image {
-            max-width: 200px; /* Set a maximum width for input images */
-            max-height: 200px; /* Set a maximum height for input images */
-            border: 1px solid #ccc;
-            padding: 5px;
+        .container {
+            max-width: 800px;
         }
-        #result {
-            max-width: 400px; /* Set a maximum width for the result image */
-            max-height: 400px; /* Set a maximum height for the result image */
+        .card {
             margin-top: 20px;
-            border: 1px solid #ccc;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        #result-image {
+            max-width: 100%;
+            max-height: 400px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            margin: 0 auto;
+        }
+        .progress {
+            height: 25px;
+        }
+        .preview-image {
+            max-width: 100%;
+            max-height: 200px;
+            width: auto;
+            height: auto;
+            object-fit: contain;
+            display: block;
+            margin: 10px auto;
         }
     </style>
 </head>
 <body>
-    <h1>Face Swap Application</h1>
-    <form id="upload-form" enctype="multipart/form-data">
-        <input type="file" name="file1" accept="image/*" required>
-        <input type="file" name="file2" accept="image/*" required>
-        <input type="number" name="num_faces" min="1" value="1" required>
-        <button type="submit">Swap Faces</button>
-    </form>
-    <div id="progress"></div>
+    <div class="container mt-5">
+        <h1 class="text-center mb-4">Face Swap Application</h1>
+        
+        <div class="card">
+            <div class="card-body">
+                <form id="upload-form" enctype="multipart/form-data">
+                    <div class="mb-3">
+                        <label for="file1" class="form-label">Source Image:</label>
+                        <input type="file" class="form-control" id="file1" name="file1" accept="image/*" required>
+                        <img id="preview1" src="#" alt="Source Preview" class="preview-image" style="display:none;">
+                    </div>
+                    <div class="mb-3">
+                        <label for="file2" class="form-label">Target Image:</label>
+                        <input type="file" class="form-control" id="file2" name="file2" accept="image/*" required>
+                        <img id="preview2" src="#" alt="Target Preview" class="preview-image" style="display:none;">
+                    </div>
+                    <div class="mb-3">
+                        <label for="num_faces" class="form-label">Number of Faces:</label>
+                        <input type="number" class="form-control" id="num_faces" name="num_faces" min="1" value="1">
+                    </div>
+                    <div class="mb-3">
+                        <label for="recipient_email" class="form-label">Recipient Email (optional):</label>
+                        <input type="email" class="form-control" id="recipient_email" name="recipient_email" placeholder="example@example.com">
+                    </div>
+                    <button type="submit" class="btn btn-primary">Swap Faces</button>
+                </form>
+            </div>
+        </div>
 
-    <div id="input-images">
-        <img id="input-image1" class="input-image" style="display: none;">
-        <img id="input-image2" class="input-image" style="display: none;">
+        <div id="progress-container" class="mt-4" style="display: none;">
+            <div class="progress">
+                <div id="progress-bar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <p id="progress-text" class="text-center mt-2"></p>
+        </div>
+        
+        <div id="result" class="mt-4" style="display: none;">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Result</h5>
+                    <div class="text-center">
+                        <img id="result-image" class="img-fluid mb-3">
+                    </div>
+                    <div class="d-grid gap-2">
+                        <a id="download-link" class="btn btn-success" download="face_swap_result.jpg">Download Result</a>
+                        <button id="send-email" class="btn btn-info">Send Result via Email</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    
-    <img id="result" style="display: none;">
-    <a id="download-link" style="display: none;" download="face_swap_result.jpg">Download Result</a>
 
     <script>
         $(document).ready(function() {
-            $('input[type="file"]').change(function(e) {
-                const fileInput = e.target;
-                const reader = new FileReader();
-                reader.onload = function(event) {
-                    const imgElement = fileInput.name === 'file1' ? '#input-image1' : '#input-image2';
-                    $(imgElement).attr('src', event.target.result).show();
-                };
-                reader.readAsDataURL(fileInput.files[0]);
-            });
-
-            $('#upload-form').submit(function(e) {
+            $('#upload-form').on('submit', function(e) {
                 e.preventDefault();
                 var formData = new FormData(this);
-                
+
+                $('#progress-container').show();
+                $('#result').hide();
+
                 $.ajax({
                     url: '/upload',
                     type: 'POST',
                     data: formData,
-                    processData: false,
                     contentType: false,
-                    success: function(data) {
+                    processData: false,
+                    success: function(response) {
                         checkProgress();
-                    },
-                    error: function(jqXHR, textStatus, errorThrown) {
-                        alert('Error: ' + errorThrown);
                     }
                 });
             });
 
             function checkProgress() {
-                $.getJSON('/progress', function(data) {
-                    $('#progress').text('Progress: ' + data.progress + '%');
+                $.get('/progress', function(data) {
+                    var progress = data.progress;
+                    $('#progress-bar').css('width', progress + '%').attr('aria-valuenow', progress);
+                    $('#progress-text').text('Progress: ' + progress + '%');
                     if (data.processing) {
                         setTimeout(checkProgress, 1000);
                     } else {
@@ -86,17 +129,51 @@
             }
 
             function getResult() {
-                $.getJSON('/result', function(data) {
-                    if (data.image) {
-                        $('#result').attr('src', 'data:image/jpeg;base64,' + data.image).show();
-                        $('#download-link')
-                            .attr('href', '/download/' + data.result_id)
-                            .show();
-                    } else {
-                        alert('Error: Result not found');
-                    }
+                $.get('/result', function(data) {
+                    $('#result-image').attr('src', 'data:image/jpeg;base64,' + data.image);
+                    $('#download-link').attr('href', '/download/' + data.result_id);
+                    $('#result').fadeIn();
+                    $('#progress-container').hide();
                 });
             }
+
+            $('#send-email').on('click', function() {
+                var recipientEmail = $('input[name="recipient_email"]').val();
+                if (recipientEmail) {
+                    $.ajax({
+                        url: '/send_email',
+                        type: 'POST',
+                        contentType: 'application/json',
+                        data: JSON.stringify({recipient_email: recipientEmail}),
+                        success: function(response) {
+                            alert('Email sent successfully!');
+                        },
+                        error: function(xhr, status, error) {
+                            alert('Failed to send email: ' + xhr.responseJSON.error);
+                        }
+                    });
+                } else {
+                    alert('Please enter a recipient email address.');
+                }
+            });
+
+            function readURL(input, previewId) {
+                if (input.files && input.files[0]) {
+                    var reader = new FileReader();
+                    reader.onload = function(e) {
+                        $('#' + previewId).attr('src', e.target.result).show();
+                    }
+                    reader.readAsDataURL(input.files[0]);
+                }
+            }
+
+            $("#file1").change(function() {
+                readURL(this, "preview1");
+            });
+
+            $("#file2").change(function() {
+                readURL(this, "preview2");
+            });
         });
     </script>
 </body>

@@ -12,10 +12,18 @@ import base64
 import threading
 import uuid
 import io
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.image import MIMEImage
 
 app = Flask(__name__)
 app.config['UPLOAD_FOLDER'] = 'uploads'
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max-limit
+
+# กำหนด Gmail ต้นทาง
+SENDER_EMAIL = "patcharadanai-s@rmutp.ac.th"
+SENDER_PASSWORD = "dead254501"  # ใช้ App Password สำหรับความปลอดภัย
 
 class FaceSwapApp:
     def __init__(self):
@@ -78,6 +86,7 @@ def upload_files():
     file1 = request.files['file1']
     file2 = request.files['file2']
     num_faces = int(request.form.get('num_faces', 1))
+    recipient_email = request.form.get('recipient_email', '')
 
     if file1.filename == '' or file2.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -95,7 +104,7 @@ def upload_files():
         thread = threading.Thread(target=face_swap_app.process_images, args=(filepath1, filepath2, num_faces))
         thread.start()
 
-        return jsonify({'message': 'Processing started'}), 200
+        return jsonify({'message': 'Processing started', 'recipient_email': recipient_email}), 200
 
 @app.route('/progress')
 def progress():
@@ -134,6 +143,43 @@ def download(result_id):
     else:
         return jsonify({'error': 'Result not found'}), 404
 
+@app.route('/send_email', methods=['POST'])
+def send_email():
+    recipient_email = request.json.get('recipient_email')
+    if not recipient_email:
+        return jsonify({'error': 'Recipient email is required'}), 400
+
+    if face_swap_app.result is not None:
+        _, buffer = cv2.imencode('.jpg', face_swap_app.result)
+        img_data = buffer.tobytes()
+
+        try:
+            msg = MIMEMultipart()
+            msg['From'] = SENDER_EMAIL
+            msg['To'] = recipient_email
+            
+            # แยกชื่อผู้ใช้จากอีเมล
+            recipient_name = recipient_email.split('@')[0].split('-')[0]
+            msg['Subject'] = f"รูปภาพคุณ {recipient_name}"
+
+            text = MIMEText(f"เรียนคุณ {recipient_name}\n\nนี่คือรูปภาพของคุณครับ")
+            msg.attach(text)
+
+            image = MIMEImage(img_data, name="face_swap_result.jpg")
+            msg.attach(image)
+
+            server = smtplib.SMTP('smtp.gmail.com', 587)
+            server.starttls()
+            server.login(SENDER_EMAIL, SENDER_PASSWORD)
+            server.send_message(msg)
+            server.quit()
+
+            return jsonify({'message': 'Email sent successfully'}), 200
+        except Exception as e:
+            return jsonify({'error': f'Failed to send email: {str(e)}'}), 500
+    else:
+        return jsonify({'error': 'Result not found'}), 404
+
 if __name__ == '__main__':
     os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-    app.run(host='0.0.0.0',debug=True)
+    app.run(host='0.0.0.0', debug=True)
